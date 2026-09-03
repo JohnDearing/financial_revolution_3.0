@@ -1,0 +1,220 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  member
+  admin
+}
+
+enum MembershipStatus {
+  pending
+  active
+  past_due
+  canceled
+  inactive
+}
+
+enum EmailTokenType {
+  email_verification
+  password_reset
+}
+
+enum ContentStatus {
+  draft
+  scheduled
+  published
+}
+
+enum TelegramConnectionStatus {
+  pending
+  connected
+  disconnected
+  revoked
+}
+
+enum TelegramInvitationStatus {
+  not_eligible
+  awaiting_connection
+  invites_sent
+  access_granted
+  access_revoked
+}
+
+model User {
+  id                 String                   @id @default(cuid())
+  email              String                   @unique
+  passwordHash       String
+  fullName           String
+  role               UserRole                 @default(member)
+  isEmailVerified    Boolean                  @default(false)
+  emailVerifiedAt    DateTime?
+  referralInvites    Int                      @default(0)
+  referralSignups    Int                      @default(0)
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+  memberships        Membership[]
+  sessions           Session[]
+  emailTokens        EmailVerificationToken[]
+  learningProgress   LearningProgress?
+  telegramConnection TelegramConnection?
+
+  @@map("users")
+}
+
+model Membership {
+  id                      String           @id @default(cuid())
+  userId                  String           @unique
+  user                    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status                  MembershipStatus @default(pending)
+  enrollmentPaid          Boolean          @default(false)
+  monthlyStartsAt         DateTime?
+  stripeCustomerId        String?
+  stripeSubscriptionId    String?
+  stripeCheckoutSessionId String?
+  telegramInvitedAt       DateTime?
+  telegramInviteLink      String?
+  canceledAt              DateTime?
+  updatedAt               DateTime         @updatedAt
+
+  @@map("memberships")
+}
+
+model LearningProgress {
+  id                 String    @id @default(cuid())
+  userId             String    @unique
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  completedModuleIds Json      @default("[]")
+  streakDays         Int       @default(0)
+  lastActivityAt     DateTime?
+  updatedAt          DateTime  @updatedAt
+  createdAt          DateTime  @default(now())
+
+  @@map("learning_progress")
+}
+
+model ContentItem {
+  id             String        @id @default(cuid())
+  title          String
+  type           String
+  track          String?
+  description    String?
+  status         ContentStatus @default(draft)
+  videoUrl       String?
+  videoPublicId  String?
+  thumbnailUrl   String?
+  durationSec    Int?
+  scheduledFor   DateTime?
+  publishedAt    DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@map("content_items")
+}
+
+model Session {
+  id               String    @id @default(cuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokenHash String    @unique
+  userAgent        String?
+  ipAddress        String?
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model EmailVerificationToken {
+  id        String         @id @default(cuid())
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      EmailTokenType
+  tokenHash String         @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime       @default(now())
+
+  @@index([userId, type])
+  @@index([expiresAt])
+  @@map("email_tokens")
+}
+
+model TelegramConnection {
+  id                    String                    @id @default(cuid())
+  userId                String                    @unique
+  user                  User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  telegramUserId        String?                   @unique
+  telegramUsername      String?
+  telegramFirstName     String?
+  telegramLastName      String?
+  connectionStatus      TelegramConnectionStatus  @default(pending)
+  invitationStatus      TelegramInvitationStatus  @default(not_eligible)
+  groupInviteLink       String?
+  channelInviteLink     String?
+  groupAccessActive     Boolean                   @default(false)
+  channelAccessActive   Boolean                   @default(false)
+  connectedAt           DateTime?
+  lastInvitedAt         DateTime?
+  accessRevokedAt       DateTime?
+  connectTokenHash      String?                   @unique
+  connectTokenExpiresAt DateTime?
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+  events                TelegramAccessEvent[]
+
+  @@index([connectionStatus])
+  @@index([invitationStatus])
+  @@map("telegram_connections")
+}
+
+model TelegramAccessEvent {
+  id           String             @id @default(cuid())
+  connectionId String
+  connection   TelegramConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  userId       String
+  action       String
+  target       String?
+  detail       String?
+  metadata     Json?
+  createdAt    DateTime           @default(now())
+
+  @@index([userId, createdAt])
+  @@index([connectionId, createdAt])
+  @@map("telegram_access_events")
+}
+
+model PlatformSettings {
+  id                                 String   @id @default("default")
+  requireEmailVerification           Boolean  @default(true)
+  requireEnrollmentForLearning       Boolean  @default(true)
+  requireActiveMembershipForTelegram Boolean  @default(true)
+  allowMemberSelfCancel              Boolean  @default(true)
+  revokeTelegramOnCancel             Boolean  @default(true)
+  revokeTelegramOnPastDue            Boolean  @default(false)
+  newSignupsEnabled                  Boolean  @default(true)
+  maintenanceMode                    Boolean  @default(false)
+  emailWelcomeEnabled                Boolean  @default(true)
+  emailPaymentFailedEnabled          Boolean  @default(true)
+  emailCanceledEnabled               Boolean  @default(true)
+  emailRestoredEnabled               Boolean  @default(true)
+  emailRenewalEnabled                Boolean  @default(true)
+  defaultPlanName                    String   @default("Financial Revolution Membership")
+  enrollmentFeeLabel                 String   @default("$150")
+  monthlyPriceLabel                  String   @default("$99")
+  supportEmail                       String   @default("support@financialrevolution.com")
+  onboardingWelcomeMessage           String   @default("Welcome to Financial Revolution 3.0. Verify your email, complete enrollment, then connect Telegram for live community access.")
+  updatedAt                          DateTime @updatedAt
+  updatedByUserId                    String?
+
+  @@map("platform_settings")
+}

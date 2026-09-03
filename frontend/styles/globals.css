@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+:root {
+  --background: #080808;
+  --foreground: #f4f4f4;
+  --gold: #c9a34d;
+  --gold-soft: #f6e5b6;
+  --surface: #111111;
+  --surface-muted: #191919;
+  --border: #2a2a2a;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-gold: var(--gold);
+  --color-gold-soft: var(--gold-soft);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-border: var(--border);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+* {
+  border-color: var(--border);
+}
+
+a {
+  transition: all 0.2s ease;
+}
+
+.gold-gradient {
+  background: linear-gradient(140deg, #f6e5b6 0%, #c9a34d 45%, #8f6d2c 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.section-shell {
+  @apply mx-auto w-full max-w-6xl px-6 md:px-10;
+}

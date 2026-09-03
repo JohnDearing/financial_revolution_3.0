@@ -1,0 +1,40 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "src/server.ts",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/health",
+      "dest": "src/server.ts",
+      "methods": ["GET"]
+    },
+    {
+      "src": "/api/auth/(.*)",
+      "dest": "src/server.ts"
+    },
+    {
+      "src": "/api/members/(.*)",
+      "dest": "src/server.ts"
+    },
+    {
+      "src": "/api/admin/(.*)",
+      "dest": "src/server.ts"
+    },
+    {
+      "src": "/api/webhooks/(.*)",
+      "dest": "src/server.ts",
+      "methods": ["POST", "GET", "PATCH"]
+    },
+    {
+      "src": "/(.*)",
+      "dest": "src/server.ts"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  }
+}
