@@ -1,4 +1,5 @@
 import type { EmailTokenType } from "@prisma/client";
+import bcrypt from "bcryptjs";
 import { prisma } from "../../lib/prisma.js";
 import {
   createOpaqueToken,
@@ -172,7 +173,6 @@ export async function resetPasswordWithCode(params: {
     throw new HttpError(400, "Invalid or expired reset code");
   }
 
-  const bcrypt = await import("bcryptjs");
   const passwordHash = await bcrypt.hash(params.newPassword, 10);
 
   await prisma.$transaction([
