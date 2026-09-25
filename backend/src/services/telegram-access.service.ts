@@ -523,9 +523,7 @@ export async function getMemberTelegramAccess(userId: string) {
     group: {
       name: getTelegramCommunityLabel("group"),
       inviteLink:
-        unlocked &&
-        connection.groupAccessActive &&
-        isPersonalInviteLink("group", connection.groupInviteLink)
+        unlocked && connection.groupAccessActive
           ? connection.groupInviteLink
           : null,
       accessActive: connection.groupAccessActive,
@@ -533,9 +531,7 @@ export async function getMemberTelegramAccess(userId: string) {
     channel: {
       name: getTelegramCommunityLabel("channel"),
       inviteLink:
-        unlocked &&
-        connection.channelAccessActive &&
-        isPersonalInviteLink("channel", connection.channelInviteLink)
+        unlocked && connection.channelAccessActive
           ? connection.channelInviteLink
           : null,
       accessActive: connection.channelAccessActive,
