@@ -63,6 +63,14 @@ export function getStaticInviteLink(target: TelegramChatTarget) {
     : env.telegramChannelInviteLink;
 }
 
+/** True when the link is a member-specific invite, not the shared env fallback. */
+export function isPersonalInviteLink(
+  target: TelegramChatTarget,
+  inviteLink?: string | null,
+) {
+  return Boolean(inviteLink && inviteLink !== getStaticInviteLink(target));
+}
+
 export function getTelegramCommunityLabel(target: TelegramChatTarget) {
   return target === "group" ? env.telegramGroupName : env.telegramChannelName;
 }
@@ -81,15 +89,18 @@ export async function createChatInviteLink(params: {
     };
   }
 
-  const expireDate =
-    Math.floor(Date.now() / 1000) + 60 * 60 * 24 * (params.expireDays ?? 14);
-
-  const result = await telegramApi<ChatInviteLink>("createChatInviteLink", {
+  const body: Record<string, unknown> = {
     chat_id: chatId,
     name: params.label.slice(0, 32),
+    // One join per paid member. Omit expire_date so the link stays valid until used.
     member_limit: params.memberLimit ?? 1,
-    expire_date: expireDate,
-  });
+  };
+  if (params.expireDays && params.expireDays > 0) {
+    body.expire_date =
+      Math.floor(Date.now() / 1000) + 60 * 60 * 24 * params.expireDays;
+  }
+
+  const result = await telegramApi<ChatInviteLink>("createChatInviteLink", body);
 
   if (result?.invite_link) {
     return { inviteLink: result.invite_link, source: "bot" as const };

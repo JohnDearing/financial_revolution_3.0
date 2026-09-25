@@ -66,10 +66,8 @@ export async function sendMembershipWelcomeNotifications(
   }
 
   const telegram = await getMemberTelegramAccess(membership.userId);
-  const groupInviteLink =
-    telegram?.group.inviteLink ?? env.telegramGroupInviteLink;
-  const channelInviteLink =
-    telegram?.channel.inviteLink ?? env.telegramChannelInviteLink;
+  const groupInviteLink = telegram?.group.inviteLink ?? null;
+  const channelInviteLink = telegram?.channel.inviteLink ?? null;
 
   const template = membershipWelcomeEmailTemplate({
     fullName: user.fullName,
@@ -130,10 +128,8 @@ export async function onMembershipActivated(params: {
     const telegram = await getMemberTelegramAccess(membership.userId);
     const template = membershipRestoredEmailTemplate({
       fullName: user.fullName,
-      groupInviteLink:
-        telegram?.group.inviteLink ?? env.telegramGroupInviteLink,
-      channelInviteLink:
-        telegram?.channel.inviteLink ?? env.telegramChannelInviteLink,
+      groupInviteLink: telegram?.group.inviteLink ?? null,
+      channelInviteLink: telegram?.channel.inviteLink ?? null,
       awaitingConnection: telegram?.invitationStatus === "awaiting_connection",
     });
     await sendEmail({

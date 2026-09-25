@@ -8,6 +8,7 @@ import { telegramInviteEmailTemplate } from "../emails/templates.js";
 import {
   createChatInviteLink,
   getTelegramCommunityLabel,
+  isPersonalInviteLink,
   isTelegramAccessConfigured,
   isTelegramBotConfigured,
   kickTelegramMember,
@@ -54,6 +55,48 @@ async function logEvent(params: {
       metadata: params.metadata,
     },
   });
+}
+
+function metadataFlag(
+  metadata: Prisma.JsonValue | null | undefined,
+  key: string,
+) {
+  return Boolean(
+    metadata &&
+      typeof metadata === "object" &&
+      !Array.isArray(metadata) &&
+      (metadata as Record<string, unknown>)[key] === true,
+  );
+}
+
+async function hasDurablePersonalInvites(
+  userId: string,
+  connection: {
+    groupAccessActive: boolean;
+    channelAccessActive: boolean;
+    groupInviteLink: string | null;
+    channelInviteLink: string | null;
+  },
+) {
+  if (
+    !connection.groupAccessActive ||
+    !connection.channelAccessActive ||
+    !isPersonalInviteLink("group", connection.groupInviteLink) ||
+    !isPersonalInviteLink("channel", connection.channelInviteLink)
+  ) {
+    return false;
+  }
+
+  const lastGrant = await prisma.telegramAccessEvent.findFirst({
+    where: {
+      userId,
+      action: { in: ["access_granted", "access_restored"] },
+    },
+    orderBy: { createdAt: "desc" },
+    select: { metadata: true },
+  });
+
+  return metadataFlag(lastGrant?.metadata, "neverExpires");
 }
 
 export async function markTelegramEligible(userId: string) {
@@ -229,17 +272,43 @@ export async function grantTelegramAccess(
     await unbanTelegramMember("channel", connection.telegramUserId);
   }
 
+  const durableInvites = await hasDurablePersonalInvites(userId, connection);
+  const reuseGroup =
+    durableInvites && isPersonalInviteLink("group", connection.groupInviteLink);
+  const reuseChannel =
+    durableInvites &&
+    isPersonalInviteLink("channel", connection.channelInviteLink);
+
   const label = `FR3 ${user.fullName}`.slice(0, 32);
   const [groupInvite, channelInvite] = await Promise.all([
-    createChatInviteLink({ target: "group", label: `${label} G` }),
-    createChatInviteLink({ target: "channel", label: `${label} C` }),
+    reuseGroup
+      ? Promise.resolve({
+          inviteLink: connection.groupInviteLink!,
+          source: "existing" as const,
+        })
+      : createChatInviteLink({ target: "group", label: `${label} G` }),
+    reuseChannel
+      ? Promise.resolve({
+          inviteLink: connection.channelInviteLink!,
+          source: "existing" as const,
+        })
+      : createChatInviteLink({ target: "channel", label: `${label} C` }),
   ]);
 
-  // Revoke previous single-use links when regenerating (never revoke shared static links).
-  if (connection.groupInviteLink && connection.groupInviteLink !== groupInvite.inviteLink) {
+  const issuedNew = !reuseGroup || !reuseChannel;
+
+  // Only revoke a previous personal link when replacing it. Never revoke unused paid links.
+  if (
+    issuedNew &&
+    !reuseGroup &&
+    connection.groupInviteLink &&
+    connection.groupInviteLink !== groupInvite.inviteLink
+  ) {
     await revokeChatInviteLink("group", connection.groupInviteLink);
   }
   if (
+    issuedNew &&
+    !reuseChannel &&
     connection.channelInviteLink &&
     connection.channelInviteLink !== channelInvite.inviteLink
   ) {
@@ -261,7 +330,7 @@ export async function grantTelegramAccess(
       groupAccessActive: true,
       channelAccessActive: true,
       invitationStatus,
-      lastInvitedAt: now,
+      lastInvitedAt: issuedNew ? now : connection.lastInvitedAt ?? now,
       accessRevokedAt: null,
       connectionStatus: linked ? "connected" : connection.connectionStatus,
     },
@@ -275,23 +344,29 @@ export async function grantTelegramAccess(
     },
   });
 
-  await logEvent({
-    connectionId: connection.id,
-    userId,
-    action: reason === "restored" ? "access_restored" : "access_granted",
-    target: "both",
-    detail: linked
-      ? "Invites issued for group and channel"
-      : "Paid-member invites issued (Connect Telegram still recommended for secure account linking)",
-    metadata: {
-      groupInvite: groupInvite.inviteLink,
-      channelInvite: channelInvite.inviteLink,
-      reason,
-      linked,
-    },
-  });
+  if (issuedNew || reason !== "status_sync") {
+    await logEvent({
+      connectionId: connection.id,
+      userId,
+      action: reason === "restored" ? "access_restored" : "access_granted",
+      target: "both",
+      detail: issuedNew
+        ? linked
+          ? "Single-use invites issued for group and channel (no expiry)"
+          : "Paid-member single-use invites issued (no expiry). Connect Telegram still recommended."
+        : "Existing unused paid invites reused — emailed links stay valid",
+      metadata: {
+        groupInvite: groupInvite.inviteLink,
+        channelInvite: channelInvite.inviteLink,
+        reason,
+        linked,
+        reused: !issuedNew,
+        neverExpires: true,
+      },
+    });
+  }
 
-  if (connection.telegramUserId) {
+  if (connection.telegramUserId && issuedNew) {
     await sendTelegramDirectMessage(
       connection.telegramUserId,
       [
@@ -303,7 +378,7 @@ export async function grantTelegramAccess(
         `Channel: ${env.telegramChannelName}`,
         channelInvite.inviteLink,
         "",
-        "These invites are for your paid membership only. Do not share them.",
+        "Each invite is for you only and does not expire until you join. Do not share them.",
       ].join("\n"),
     );
   }
@@ -411,12 +486,14 @@ export async function getMemberTelegramAccess(userId: string) {
   const membership = await prisma.membership.findUnique({ where: { userId } });
   if (!membership) return null;
 
-  const connection = await ensureConnection(userId);
+  let connection = await ensureConnection(userId);
   const unlocked = await memberEligibleForTelegram(membership);
-  const connected =
-    Boolean(connection.telegramUserId) &&
-    (connection.connectionStatus === "connected" ||
-      connection.connectionStatus === "revoked");
+
+  // Replace shared fallbacks and legacy 14-day links the next time the member opens the portal.
+  if (unlocked && !(await hasDurablePersonalInvites(userId, connection))) {
+    await grantTelegramAccess(userId, "status_sync");
+    connection = await ensureConnection(userId);
+  }
 
   const recentEvents = await prisma.telegramAccessEvent.findMany({
     where: { userId },
@@ -446,7 +523,9 @@ export async function getMemberTelegramAccess(userId: string) {
     group: {
       name: getTelegramCommunityLabel("group"),
       inviteLink:
-        unlocked && connection.groupAccessActive
+        unlocked &&
+        connection.groupAccessActive &&
+        isPersonalInviteLink("group", connection.groupInviteLink)
           ? connection.groupInviteLink
           : null,
       accessActive: connection.groupAccessActive,
@@ -454,7 +533,9 @@ export async function getMemberTelegramAccess(userId: string) {
     channel: {
       name: getTelegramCommunityLabel("channel"),
       inviteLink:
-        unlocked && connection.channelAccessActive
+        unlocked &&
+        connection.channelAccessActive &&
+        isPersonalInviteLink("channel", connection.channelInviteLink)
           ? connection.channelInviteLink
           : null,
       accessActive: connection.channelAccessActive,

@@ -209,39 +209,45 @@ export function MemberSupportClient() {
                   ) : null}
 
                   {hasInvites ? (
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <a
-                        href={community.group.inviteLink!}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="rounded-xl border border-gold/30 bg-gold/10 p-3 transition hover:border-gold/50"
-                      >
-                        <p className="text-xs uppercase tracking-[0.12em] text-gold">
-                          Group chat
-                        </p>
-                        <p className="mt-1 text-sm font-medium text-white">
-                          {community.group.name}
-                        </p>
-                        <p className="mt-2 inline-flex items-center gap-1 text-xs text-zinc-300">
-                          Join group <ExternalLink size={12} />
-                        </p>
-                      </a>
-                      <a
-                        href={community.channel.inviteLink!}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="rounded-xl border border-gold/30 bg-gold/10 p-3 transition hover:border-gold/50"
-                      >
-                        <p className="text-xs uppercase tracking-[0.12em] text-gold">
-                          Channel
-                        </p>
-                        <p className="mt-1 text-sm font-medium text-white">
-                          {community.channel.name}
-                        </p>
-                        <p className="mt-2 inline-flex items-center gap-1 text-xs text-zinc-300">
-                          Join channel <ExternalLink size={12} />
-                        </p>
-                      </a>
+                    <div className="space-y-3">
+                      <p className="text-sm text-zinc-400">
+                        Each link is for you only and does not expire until you join.
+                        Do not share them.
+                      </p>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <a
+                          href={community.group.inviteLink!}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded-xl border border-gold/30 bg-gold/10 p-3 transition hover:border-gold/50"
+                        >
+                          <p className="text-xs uppercase tracking-[0.12em] text-gold">
+                            Group chat
+                          </p>
+                          <p className="mt-1 text-sm font-medium text-white">
+                            {community.group.name}
+                          </p>
+                          <p className="mt-2 inline-flex items-center gap-1 text-xs text-zinc-300">
+                            Join group <ExternalLink size={12} />
+                          </p>
+                        </a>
+                        <a
+                          href={community.channel.inviteLink!}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded-xl border border-gold/30 bg-gold/10 p-3 transition hover:border-gold/50"
+                        >
+                          <p className="text-xs uppercase tracking-[0.12em] text-gold">
+                            Channel
+                          </p>
+                          <p className="mt-1 text-sm font-medium text-white">
+                            {community.channel.name}
+                          </p>
+                          <p className="mt-2 inline-flex items-center gap-1 text-xs text-zinc-300">
+                            Join channel <ExternalLink size={12} />
+                          </p>
+                        </a>
+                      </div>
                     </div>
                   ) : connected ? (
                     <p className="text-sm text-zinc-400">

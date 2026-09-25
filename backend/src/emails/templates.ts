@@ -192,7 +192,7 @@ export function membershipWelcomeEmailTemplate(params: {
       <div style="margin:24px 0;padding:18px;border:1px solid #3f3a1f;border-radius:12px;background:#1a170c;">
         <p style="margin:0 0 8px;color:#c9a227;font-size:12px;letter-spacing:0.14em;text-transform:uppercase;font-weight:700;">Private Telegram access</p>
         <p style="margin:0 0 12px;color:#e4e4e7;font-size:14px;line-height:1.7;">
-          Your paid membership unlocks both communities immediately:
+          Your paid membership unlocks both communities immediately. Each link is for you only and does not expire until you join. Do not share them.
         </p>
         <p style="margin:0;color:#fafafa;font-size:14px;line-height:1.7;">
           <strong>${escapeHtml(params.groupName)}</strong><br/>
@@ -264,7 +264,7 @@ export function telegramInviteEmailTemplate(params: {
       title: "Your Telegram invites are ready",
       greeting: `Hi ${params.fullName},`,
       intro:
-        "Your Telegram account is connected. Use the secure invites below to join both communities. Do not share these links.",
+        "Your Telegram account is connected. Use the secure invites below to join both communities. Each link admits one person and does not expire until you join. Do not share them.",
       details: [
         { label: "Group chat", value: params.groupName },
         { label: "Channel", value: params.channelName },
